@@ -15,9 +15,7 @@
     --text: #e2e8f0;
     --muted: #6b7280;
   }
-
   * { box-sizing: border-box; margin: 0; padding: 0; }
-
   body {
     font-family: 'Segoe UI', system-ui, sans-serif;
     background: var(--bg);
@@ -26,163 +24,151 @@
     max-width: 760px;
     margin: 0 auto;
     min-height: 100vh;
-    transition: background 1.5s ease;
   }
-
   h1 {
-    font-size: 1.6rem;
-    margin-bottom: 4px;
-    color: var(--c1);
-    text-shadow: 0 0 20px var(--c1);
+    font-size: 1.6rem; margin-bottom: 4px;
+    color: var(--c1); text-shadow: 0 0 20px var(--c1);
     transition: color 1.5s ease, text-shadow 1.5s ease;
   }
-
   .subtitle {
-    font-size: 0.8rem;
-    color: var(--muted);
-    margin-bottom: 20px;
-    letter-spacing: 2px;
-    text-transform: uppercase;
+    font-size: 0.8rem; color: var(--muted);
+    margin-bottom: 20px; letter-spacing: 2px; text-transform: uppercase;
   }
-
   h2 {
-    font-size: 1rem;
-    margin-bottom: 12px;
-    color: var(--c2);
-    text-shadow: 0 0 12px var(--c2);
+    font-size: 1rem; margin-bottom: 12px;
+    color: var(--c2); text-shadow: 0 0 12px var(--c2);
     transition: color 1.5s ease, text-shadow 1.5s ease;
     letter-spacing: 1px;
   }
-
   .card {
-    background: var(--card);
-    border-radius: 14px;
-    padding: 20px;
-    margin-bottom: 16px;
-    border: 1px solid var(--c3);
+    background: var(--card); border-radius: 14px; padding: 20px;
+    margin-bottom: 16px; border: 1px solid var(--c3);
     box-shadow: 0 0 24px -8px var(--c3);
     transition: border-color 1.5s ease, box-shadow 1.5s ease;
   }
-
   .status-dot {
-    display: inline-block;
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    margin-right: 8px;
-    vertical-align: middle;
-    transition: background 1.5s ease;
+    display: inline-block; width: 12px; height: 12px;
+    border-radius: 50%; margin-right: 8px; vertical-align: middle;
   }
   .connected { background: #22c55e; box-shadow: 0 0 12px #22c55e; }
   .disconnected { background: #ef4444; box-shadow: 0 0 12px #ef4444; }
-
+  .connecting { background: #f59e0b; box-shadow: 0 0 12px #f59e0b; }
   label {
-    display: block;
-    font-size: 0.8rem;
-    color: var(--muted);
-    margin-bottom: 4px;
-    margin-top: 14px;
-    letter-spacing: 1px;
-    text-transform: uppercase;
+    display: block; font-size: 0.8rem; color: var(--muted);
+    margin-bottom: 4px; margin-top: 14px;
+    letter-spacing: 1px; text-transform: uppercase;
   }
-
   input, textarea {
-    width: 100%;
-    padding: 12px;
-    border-radius: 10px;
-    border: 1px solid var(--c4);
-    background: #0a0a0f;
-    color: var(--text);
-    font-size: 1rem;
-    outline: none;
-    transition: border-color 1.5s ease, box-shadow 0.3s ease;
+    width: 100%; padding: 12px; border-radius: 10px;
+    border: 1px solid var(--c4); background: #0a0a0f;
+    color: var(--text); font-size: 1rem; outline: none;
+    transition: border-color 1.5s ease;
   }
-
-  input:focus {
-    box-shadow: 0 0 16px -2px var(--c4);
-  }
-
   button {
-    background: transparent;
-    color: var(--c1);
-    border: 2px solid var(--c1);
-    padding: 14px 24px;
-    border-radius: 10px;
-    font-size: 1rem;
-    font-weight: 600;
-    cursor: pointer;
-    margin-top: 18px;
-    width: 100%;
-    letter-spacing: 2px;
-    text-transform: uppercase;
+    background: transparent; color: var(--c1);
+    border: 2px solid var(--c1); padding: 14px 24px;
+    border-radius: 10px; font-size: 1rem; font-weight: 600;
+    cursor: pointer; margin-top: 18px; width: 100%;
+    letter-spacing: 2px; text-transform: uppercase;
     transition: all 0.3s ease;
     box-shadow: 0 0 16px -4px var(--c1);
   }
-
   button:hover:not(:disabled) {
-    background: var(--c1);
-    color: #0a0a0f;
+    background: var(--c1); color: #0a0a0f;
     box-shadow: 0 0 32px -4px var(--c1);
   }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
 
-  button:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
+  /* ─── Pairing code display ─────────────────────────── */
+  .code-wrapper {
+    position: relative;
+    margin: 14px 0;
   }
-
   .code {
     font-family: 'Courier New', monospace;
     font-size: 2rem;
     letter-spacing: 6px;
     text-align: center;
-    padding: 20px;
+    padding: 20px 60px 20px 20px;
     background: #0a0a0f;
     border-radius: 10px;
-    margin: 14px 0;
     color: var(--c2);
     text-shadow: 0 0 20px var(--c2);
     border: 1px solid var(--c2);
     transition: all 1.5s ease;
+    cursor: pointer;
+    user-select: all;
+    -webkit-user-select: all;
+    word-break: break-all;
+  }
+  .code:hover {
+    background: #1a1a25;
+  }
+  .copy-btn {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    transform: translateY(-50%);
+    background: #1e1e2a;
+    border: 1px solid var(--c2);
+    color: var(--c2);
+    border-radius: 8px;
+    width: 42px;
+    height: 42px;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    cursor: pointer;
+    letter-spacing: 0;
+    transition: all 0.2s ease;
+    box-shadow: none;
+  }
+  .copy-btn:hover {
+    background: var(--c2);
+    color: #0a0a0f;
+  }
+  .copy-btn.copied {
+    background: #22c55e;
+    border-color: #22c55e;
+    color: #0a0a0f;
+  }
+  .copy-hint {
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-top: -6px;
+    margin-bottom: 8px;
   }
 
-  .post {
-    padding: 14px;
-    border-bottom: 1px solid #1e1e2a;
-    font-size: 0.9rem;
-  }
+  .post { padding: 14px; border-bottom: 1px solid #1e1e2a; font-size: 0.9rem; }
   .post:last-child { border: none; }
-
   .badge {
-    font-size: 0.65rem;
-    padding: 3px 10px;
-    border-radius: 20px;
-    font-weight: 700;
-    letter-spacing: 1px;
-    text-transform: uppercase;
+    font-size: 0.65rem; padding: 3px 10px; border-radius: 20px;
+    font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
   }
   .pending { background: #f59e0b; color: #000; }
   .posted { background: #22c55e; color: #000; }
   .failed { background: #ef4444; color: #fff; }
   .deleted { background: #64748b; color: #fff; }
-
   .muted { color: var(--muted); font-size: 0.85rem; }
-  .small {
-    font-size: 0.75rem;
-    word-break: break-all;
-    color: #64748b;
-    margin-top: 4px;
-  }
-
+  .small { font-size: 0.75rem; word-break: break-all; color: #64748b; margin-top: 4px; }
   .palette-strip {
-    display: flex;
-    height: 4px;
-    border-radius: 2px;
-    overflow: hidden;
-    margin-bottom: 20px;
+    display: flex; height: 4px; border-radius: 2px;
+    overflow: hidden; margin-bottom: 20px;
   }
-  .palette-strip div {
-    flex: 1;
-    transition: background 1.5s ease;
+  .palette-strip div { flex: 1; transition: background 1.5s ease; }
+  .session-box {
+    padding: 10px; background: #0a0a0f; border-radius: 8px;
+    margin-top: 8px; font-size: 0.85rem;
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 8px;
+  }
+  .session-box button {
+    width: auto; padding: 6px 12px; font-size: 0.7rem;
+    margin: 0; letter-spacing: 1px;
   }
 </style>
 </head>
@@ -194,20 +180,28 @@
 
   <div class="card">
     <h2>Connection</h2>
-    <p style="margin-top: 8px;">
-      <span class="status-dot disconnected" id="dot"></span>
-      <span id="statusText">Checking...</span>
-    </p>
+    <div id="sessions"></div>
+
+    <div id="pairForm">
+      <label>Phone Number (with country code)</label>
+      <input type="tel" id="phone" placeholder="254712345678">
+      <button id="pairBtn" onclick="requestPair()">Get Pairing Code</button>
+    </div>
+
     <div id="pairingBox" style="display: none;">
       <p class="muted" style="margin-top: 12px;">
         Enter this code in WhatsApp → Linked Devices → Link with phone number
       </p>
-      <div class="code" id="pairingCode">—</div>
-    </div>
-    <div id="pairForm">
-      <label>Phone Number (with country code)</label>
-      <input type="tel" id="phone" placeholder="254712345678">
-      <button onclick="requestPair()">Get Pairing Code</button>
+
+      <div class="code-wrapper">
+        <div class="code" id="pairingCode" onclick="copyCode()" title="Click to copy">—</div>
+        <button class="copy-btn" id="copyBtn" onclick="copyCode()" title="Copy code">📋</button>
+      </div>
+      <p class="copy-hint">Tap the code or the 📋 button to copy</p>
+
+      <p class="muted" style="font-size: 0.8rem; text-align: center;">
+        Code expires in ~60s. If it fails, click "Get Pairing Code" again.
+      </p>
     </div>
   </div>
 
@@ -256,47 +250,98 @@ const THEMES = [
 let idx = 0;
 function rotatePalette() {
   const root = document.documentElement;
-  const c1 = THEMES[idx % THEMES.length];
-  const c2 = THEMES[(idx + 25) % THEMES.length];
-  const c3 = THEMES[(idx + 50) % THEMES.length];
-  const c4 = THEMES[(idx + 75) % THEMES.length];
-
-  root.style.setProperty('--c1', c1);
-  root.style.setProperty('--c2', c2);
-  root.style.setProperty('--c3', c3);
-  root.style.setProperty('--c4', c4);
+  root.style.setProperty('--c1', THEMES[idx % THEMES.length]);
+  root.style.setProperty('--c2', THEMES[(idx + 25) % THEMES.length]);
+  root.style.setProperty('--c3', THEMES[(idx + 50) % THEMES.length]);
+  root.style.setProperty('--c4', THEMES[(idx + 75) % THEMES.length]);
 
   const strip = document.getElementById('strip');
   [...strip.children].forEach((seg, i) => {
     seg.style.background = THEMES[(idx + i * 5) % THEMES.length];
   });
-
   idx++;
 }
 rotatePalette();
 setInterval(rotatePalette, 3000);
 
+// ─── Copy code function ─────────────────────────────────
+async function copyCode() {
+  const codeEl = document.getElementById('pairingCode');
+  const code = codeEl.textContent.trim();
+  if (!code || code === '—') return;
+
+  // Strip dashes so WhatsApp accepts pasting
+  const clean = code.replace(/-/g, '');
+
+  try {
+    await navigator.clipboard.writeText(clean);
+    flashCopy('✓');
+  } catch (e) {
+    // Fallback for older browsers / non-HTTPS
+    const ta = document.createElement('textarea');
+    ta.value = clean;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand('copy');
+      flashCopy('✓');
+    } catch (err) {
+      flashCopy('✗');
+    }
+    document.body.removeChild(ta);
+  }
+}
+
+function flashCopy(icon) {
+  const btn = document.getElementById('copyBtn');
+  btn.textContent = icon;
+  btn.classList.add('copied');
+  setTimeout(() => {
+    btn.textContent = '📋';
+    btn.classList.remove('copied');
+  }, 1500);
+}
+
+// ─── Status polling ─────────────────────────────────────
 async function checkStatus() {
   try {
     const res = await fetch('/api/status');
     const data = await res.json();
-    const dot = document.getElementById('dot');
-    const txt = document.getElementById('statusText');
-    const pairingBox = document.getElementById('pairingBox');
-    const pairForm = document.getElementById('pairForm');
 
-    if (data.connected) {
-      dot.className = 'status-dot connected';
-      txt.textContent = 'Connected as ' + data.user;
-      pairingBox.style.display = 'none';
-      pairForm.style.display = 'none';
+    const box = document.getElementById('sessions');
+    if (data.sessions && data.sessions.length > 0) {
+      box.innerHTML = data.sessions.map(s => `
+        <div class="session-box">
+          <div>
+            <span class="status-dot ${s.status === 'connected' ? 'connected' : s.status === 'connecting' ? 'connecting' : 'disconnected'}"></span>
+            <strong>+${s.phoneNumber || s.userId}</strong>
+            <span class="muted" style="margin-left: 8px;">${s.status}</span>
+          </div>
+          <button onclick="removeSession('${s.userId}')">Unlink</button>
+        </div>
+      `).join('');
     } else {
-      dot.className = 'status-dot disconnected';
-      txt.textContent = 'Disconnected';
-      pairForm.style.display = 'block';
-      if (data.pairingCode) {
-        pairingBox.style.display = 'block';
-        document.getElementById('pairingCode').textContent = data.pairingCode;
+      box.innerHTML = '<p class="muted">No sessions linked yet.</p>';
+    }
+
+    // Auto-show fresh pairing code
+    const pairing = data.sessions?.find(s => s.pairingCode);
+    if (pairing && Date.now() - (pairing.pairingCodeAt || 0) < 55000) {
+      const codeEl = document.getElementById('pairingCode');
+      if (codeEl.textContent !== pairing.pairingCode) {
+        codeEl.textContent = pairing.pairingCode;
+      }
+      document.getElementById('pairingBox').style.display = 'block';
+    }
+
+    // Hide pairing box if any session is connected
+    if (data.sessions?.some(s => s.status === 'connected')) {
+      // Keep box visible if code is still fresh, otherwise hide
+      const anyFresh = data.sessions.some(s => s.pairingCode && Date.now() - (s.pairingCodeAt || 0) < 55000);
+      if (!anyFresh) {
+        document.getElementById('pairingBox').style.display = 'none';
       }
     }
   } catch (e) {}
@@ -306,9 +351,10 @@ async function requestPair() {
   const phone = document.getElementById('phone').value.trim();
   if (!phone) return alert('Enter your phone number');
 
-  const btn = event.target;
+  const btn = document.getElementById('pairBtn');
   btn.disabled = true;
-  btn.textContent = 'Requesting...';
+  btn.textContent = 'Requesting (may take 30s)...';
+  document.getElementById('pairingBox').style.display = 'none';
 
   try {
     const res = await fetch('/api/pair', {
@@ -317,11 +363,16 @@ async function requestPair() {
       body: JSON.stringify({ phoneNumber: phone })
     });
     const data = await res.json();
+
     if (data.error) {
       alert('Error: ' + data.error);
-    } else {
+    } else if (data.connected) {
+      alert('✅ Already connected!');
+    } else if (data.code) {
       document.getElementById('pairingCode').textContent = data.code;
       document.getElementById('pairingBox').style.display = 'block';
+    } else {
+      alert('Unexpected response. Check the panel in a few seconds.');
     }
   } catch (e) {
     alert('Request failed: ' + e.message);
@@ -329,6 +380,13 @@ async function requestPair() {
 
   btn.disabled = false;
   btn.textContent = 'Get Pairing Code';
+  checkStatus();
+}
+
+async function removeSession(userId) {
+  if (!confirm('Unlink this session?')) return;
+  await fetch('/api/sessions/' + userId, { method: 'DELETE' });
+  checkStatus();
 }
 
 async function schedulePost() {
@@ -350,7 +408,7 @@ async function schedulePost() {
     const res = await fetch('/api/schedule', { method: 'POST', body: form });
     const data = await res.json();
     if (data.error) alert('Error: ' + data.error);
-    else alert('✅ Scheduled! Post #' + data.id + '\nURL: ' + data.url);
+    else alert('✅ Scheduled! Post #' + data.id);
   } catch (e) {
     alert('Upload failed: ' + e.message);
   }
@@ -379,7 +437,7 @@ async function loadQueue() {
 
 checkStatus();
 loadQueue();
-setInterval(checkStatus, 5000);
+setInterval(checkStatus, 3000);
 setInterval(loadQueue, 10000);
 </script>
 </body>
