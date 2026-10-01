@@ -3,7 +3,12 @@ const express = require('express');
 const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
-const { connectWhatsApp, requestPairing, getStatus } = require('./whatsapp');
+const {
+  connectWhatsApp,
+  requestPairing,
+  getStatus,
+  removeSession,
+} = require('./whatsapp');
 const { uploadVideo } = require('./catbox');
 const { startScheduler } = require('./scheduler');
 const db = require('./db');
@@ -19,6 +24,7 @@ const tmpDir = path.join(dataDir, 'temp');
 if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
 const upload = multer({ dest: tmpDir });
 
+// ─── API routes ────────────────────────────────────────────────
 app.get('/api/status', (req, res) => {
   res.json(getStatus());
 });
@@ -29,37 +35,33 @@ app.post('/api/pair', async (req, res) => {
     return res.status(400).json({ error: 'Phone number required' });
   }
   try {
-    const code = await requestPairing(phoneNumber);
-    res.json({ code });
+    const result = await requestPairing(phoneNumber);
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
+app.delete('/api/sessions/:userId', async (req, res) => {
+  await removeSession(req.params.userId);
+  res.json({ ok: true });
+});
+
 app.post('/api/schedule', upload.single('video'), async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'Video file required' });
-    }
+    if (!req.file) return res.status(400).json({ error: 'Video file required' });
     const { caption, scheduledAt } = req.body;
-    if (!scheduledAt) {
-      return res.status(400).json({ error: 'Scheduled time required' });
-    }
+    if (!scheduledAt) return res.status(400).json({ error: 'Scheduled time required' });
 
     const url = await uploadVideo(req.file.path);
     fs.unlinkSync(req.file.path);
 
     const when = new Date(scheduledAt).getTime();
-    if (isNaN(when)) {
-      return res.status(400).json({ error: 'Invalid date format' });
-    }
+    if (isNaN(when)) return res.status(400).json({ error: 'Invalid date' });
 
-    const info = db
-      .prepare(
-        `INSERT INTO posts (source_url, caption, scheduled_at)
-         VALUES (?, ?, ?)`
-      )
-      .run(url, caption || '', when);
+    const info = db.prepare(
+      `INSERT INTO posts (source_url, caption, scheduled_at) VALUES (?, ?, ?)`
+    ).run(url, caption || '', when);
 
     res.json({
       success: true,
@@ -73,26 +75,22 @@ app.post('/api/schedule', upload.single('video'), async (req, res) => {
 });
 
 app.get('/api/queue', (req, res) => {
-  const rows = db
-    .prepare(
-      `SELECT id, source_url, caption, scheduled_at, status, error
-       FROM posts ORDER BY scheduled_at DESC LIMIT 50`
-    )
-    .all();
+  const rows = db.prepare(
+    `SELECT id, source_url, caption, scheduled_at, status, error
+     FROM posts ORDER BY scheduled_at DESC LIMIT 50`
+  ).all();
   res.json(rows);
 });
 
 app.delete('/api/queue/:id', (req, res) => {
-  const info = db
-    .prepare(`DELETE FROM posts WHERE id=? AND status='pending'`)
-    .run(req.params.id);
+  const info = db.prepare(`DELETE FROM posts WHERE id=? AND status='pending'`).run(req.params.id);
   res.json({ deleted: info.changes > 0 });
 });
 
+// ─── Start ─────────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`🌐 Panel running on port ${PORT}`);
-
-  connectWhatsApp(() => {
+  connectWhatsApp().then(() => {
     console.log('🚀 Starting scheduler...');
     startScheduler();
   });
