@@ -1,0 +1,7 @@
+node_modules/
+data/
+wa-auth/
+*.db
+.env
+.DS_Store
+temp/
