@@ -40,6 +40,27 @@ async function postStatus(sock, post) {
 
   const buffer = fs.readFileSync(localPath);
 
+  // ─── FIX: Build a real contact list for statusJidList ──────
+  // Fetch contacts so WhatsApp knows who to send the status to.
+  // If the list is empty, WhatsApp will silently discard the status.
+  let statusJidList = [];
+  try {
+    const contacts = await sock.getContacts();
+    statusJidList = contacts
+      .filter(c => c.id && c.id.endsWith('@s.whatsapp.net'))
+      .map(c => c.id);
+
+    // If you have no contacts, add your own ID as a fallback
+    if (statusJidList.length === 0) {
+      statusJidList = [sock.user.id];
+    }
+  } catch (err) {
+    console.error('Failed to fetch contacts for status:', err.message);
+    statusJidList = [sock.user.id];
+  }
+
+  console.log(`📤 Sending status to ${statusJidList.length} contact(s)...`);
+
   await sock.sendMessage(
     'status@broadcast',
     {
@@ -48,7 +69,7 @@ async function postStatus(sock, post) {
       mimetype: 'video/mp4',
     },
     {
-      statusJidList: [sock.user.id],
+      statusJidList: statusJidList, // Use the real contact list
       broadcast: true,
       backgroundColor: '#000000',
     }
