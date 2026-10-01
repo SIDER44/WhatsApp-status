@@ -79,7 +79,6 @@
   }
   button:disabled { opacity: 0.4; cursor: not-allowed; }
 
-  /* ─── Pairing code display ─────────────────────────── */
   .code-wrapper {
     position: relative;
     margin: 14px 0;
@@ -101,9 +100,7 @@
     -webkit-user-select: all;
     word-break: break-all;
   }
-  .code:hover {
-    background: #1a1a25;
-  }
+  .code:hover { background: #1a1a25; }
   .copy-btn {
     position: absolute;
     top: 50%;
@@ -126,21 +123,11 @@
     transition: all 0.2s ease;
     box-shadow: none;
   }
-  .copy-btn:hover {
-    background: var(--c2);
-    color: #0a0a0f;
-  }
-  .copy-btn.copied {
-    background: #22c55e;
-    border-color: #22c55e;
-    color: #0a0a0f;
-  }
+  .copy-btn:hover { background: var(--c2); color: #0a0a0f; }
+  .copy-btn.copied { background: #22c55e; border-color: #22c55e; color: #0a0a0f; }
   .copy-hint {
-    text-align: center;
-    font-size: 0.75rem;
-    color: var(--muted);
-    margin-top: -6px;
-    margin-bottom: 8px;
+    text-align: center; font-size: 0.75rem; color: var(--muted);
+    margin-top: -6px; margin-bottom: 8px;
   }
 
   .post { padding: 14px; border-bottom: 1px solid #1e1e2a; font-size: 0.9rem; }
@@ -170,6 +157,68 @@
     width: auto; padding: 6px 12px; font-size: 0.7rem;
     margin: 0; letter-spacing: 1px;
   }
+  .action-btn {
+    width: auto; padding: 6px 10px; font-size: 0.7rem;
+    margin: 0; letter-spacing: 1px; border-radius: 6px;
+  }
+  .action-row { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .clear-btn {
+    float: right; width: auto; padding: 4px 10px; font-size: 0.7rem;
+    margin: 0; letter-spacing: 1px; border-radius: 6px;
+    color: #ef4444; border-color: #ef4444;
+    box-shadow: 0 0 12px -4px #ef4444;
+  }
+  .clear-btn:hover {
+    background: #ef4444; color: #fff;
+    box-shadow: 0 0 20px -4px #ef4444;
+  }
+
+  /* ─── Activity Log ────────────────────────────────── */
+  .day-picker {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .day-picker input[type="date"] {
+    flex: 1; min-width: 150px; padding: 10px;
+    border-radius: 8px; border: 1px solid var(--c4);
+    background: #0a0a0f; color: var(--text);
+    font-size: 0.9rem;
+  }
+  .day-picker button {
+    width: auto; padding: 10px 16px; font-size: 0.8rem;
+    margin: 0; letter-spacing: 1px;
+  }
+  .day-summary {
+    font-size: 0.85rem; color: var(--muted);
+    margin-bottom: 10px; padding: 8px 12px;
+    background: #0a0a0f; border-radius: 8px;
+    border-left: 3px solid var(--c2);
+  }
+  .activity-entry {
+    padding: 10px 12px;
+    border-left: 3px solid transparent;
+    margin-bottom: 6px;
+    background: #0a0a0f;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .activity-entry.scheduled { border-left-color: #f59e0b; }
+  .activity-entry.posted { border-left-color: #22c55e; }
+  .activity-entry.failed { border-left-color: #ef4444; }
+  .activity-icon { font-size: 1.1rem; flex-shrink: 0; }
+  .activity-body { flex: 1; }
+  .activity-time {
+    font-size: 0.7rem; color: var(--muted);
+    font-family: 'Courier New', monospace;
+  }
+  .activity-msg { margin-top: 2px; }
+  .activity-url {
+    font-size: 0.7rem; color: #64748b;
+    word-break: break-all; margin-top: 4px;
+  }
 </style>
 </head>
 <body>
@@ -192,13 +241,11 @@
       <p class="muted" style="margin-top: 12px;">
         Enter this code in WhatsApp → Linked Devices → Link with phone number
       </p>
-
       <div class="code-wrapper">
         <div class="code" id="pairingCode" onclick="copyCode()" title="Click to copy">—</div>
         <button class="copy-btn" id="copyBtn" onclick="copyCode()" title="Copy code">📋</button>
       </div>
       <p class="copy-hint">Tap the code or the 📋 button to copy</p>
-
       <p class="muted" style="font-size: 0.8rem; text-align: center;">
         Code expires in ~60s. If it fails, click "Get Pairing Code" again.
       </p>
@@ -211,14 +258,27 @@
     <input type="file" id="videoFile" accept="video/*">
     <label>Caption (optional)</label>
     <input type="text" id="caption" placeholder="Your status caption...">
-    <label>Schedule Time</label>
+    <label>Schedule Time (Africa/Nairobi)</label>
     <input type="datetime-local" id="scheduledAt">
     <button id="scheduleBtn" onclick="schedulePost()">Upload &amp; Schedule</button>
   </div>
 
   <div class="card">
-    <h2>Queue</h2>
-    <div id="queueList">Loading...</div>
+    <h2>Queue
+      <button class="clear-btn" onclick="clearQueue()">🗑️ CLEAR ALL</button>
+    </h2>
+    <div id="queueList" style="clear: both;">Loading...</div>
+  </div>
+
+  <div class="card">
+    <h2>📋 Activity Log</h2>
+    <div class="day-picker">
+      <input type="date" id="activityDay">
+      <button onclick="loadActivity()">Refresh</button>
+      <button onclick="setToday()" style="color: var(--c2); border-color: var(--c2);">Today</button>
+    </div>
+    <div id="activitySummary" class="day-summary" style="display: none;"></div>
+    <div id="activityList">Loading...</div>
   </div>
 
 <script>
@@ -254,7 +314,6 @@ function rotatePalette() {
   root.style.setProperty('--c2', THEMES[(idx + 25) % THEMES.length]);
   root.style.setProperty('--c3', THEMES[(idx + 50) % THEMES.length]);
   root.style.setProperty('--c4', THEMES[(idx + 75) % THEMES.length]);
-
   const strip = document.getElementById('strip');
   [...strip.children].forEach((seg, i) => {
     seg.style.background = THEMES[(idx + i * 5) % THEMES.length];
@@ -264,32 +323,30 @@ function rotatePalette() {
 rotatePalette();
 setInterval(rotatePalette, 3000);
 
-// ─── Copy code function ─────────────────────────────────
+// ─── Get today's Nairobi date as YYYY-MM-DD ────────────────
+function getNairobiToday() {
+  const now = new Date();
+  const nairobi = new Date(now.toLocaleString('en-US', { timeZone: 'Africa/Nairobi' }));
+  const y = nairobi.getFullYear();
+  const m = String(nairobi.getMonth() + 1).padStart(2, '0');
+  const d = String(nairobi.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 async function copyCode() {
   const codeEl = document.getElementById('pairingCode');
   const code = codeEl.textContent.trim();
   if (!code || code === '—') return;
-
-  // Strip dashes so WhatsApp accepts pasting
   const clean = code.replace(/-/g, '');
-
   try {
     await navigator.clipboard.writeText(clean);
     flashCopy('✓');
   } catch (e) {
-    // Fallback for older browsers / non-HTTPS
     const ta = document.createElement('textarea');
-    ta.value = clean;
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    try {
-      document.execCommand('copy');
-      flashCopy('✓');
-    } catch (err) {
-      flashCopy('✗');
-    }
+    ta.value = clean; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); flashCopy('✓'); }
+    catch (err) { flashCopy('✗'); }
     document.body.removeChild(ta);
   }
 }
@@ -304,12 +361,10 @@ function flashCopy(icon) {
   }, 1500);
 }
 
-// ─── Status polling ─────────────────────────────────────
 async function checkStatus() {
   try {
     const res = await fetch('/api/status');
     const data = await res.json();
-
     const box = document.getElementById('sessions');
     if (data.sessions && data.sessions.length > 0) {
       box.innerHTML = data.sessions.map(s => `
@@ -326,7 +381,6 @@ async function checkStatus() {
       box.innerHTML = '<p class="muted">No sessions linked yet.</p>';
     }
 
-    // Auto-show fresh pairing code
     const pairing = data.sessions?.find(s => s.pairingCode);
     if (pairing && Date.now() - (pairing.pairingCodeAt || 0) < 55000) {
       const codeEl = document.getElementById('pairingCode');
@@ -336,9 +390,7 @@ async function checkStatus() {
       document.getElementById('pairingBox').style.display = 'block';
     }
 
-    // Hide pairing box if any session is connected
     if (data.sessions?.some(s => s.status === 'connected')) {
-      // Keep box visible if code is still fresh, otherwise hide
       const anyFresh = data.sessions.some(s => s.pairingCode && Date.now() - (s.pairingCodeAt || 0) < 55000);
       if (!anyFresh) {
         document.getElementById('pairingBox').style.display = 'none';
@@ -350,12 +402,10 @@ async function checkStatus() {
 async function requestPair() {
   const phone = document.getElementById('phone').value.trim();
   if (!phone) return alert('Enter your phone number');
-
   const btn = document.getElementById('pairBtn');
   btn.disabled = true;
   btn.textContent = 'Requesting (may take 30s)...';
   document.getElementById('pairingBox').style.display = 'none';
-
   try {
     const res = await fetch('/api/pair', {
       method: 'POST',
@@ -363,21 +413,15 @@ async function requestPair() {
       body: JSON.stringify({ phoneNumber: phone })
     });
     const data = await res.json();
-
-    if (data.error) {
-      alert('Error: ' + data.error);
-    } else if (data.connected) {
-      alert('✅ Already connected!');
-    } else if (data.code) {
+    if (data.error) alert('Error: ' + data.error);
+    else if (data.connected) alert('✅ Already connected!');
+    else if (data.code) {
       document.getElementById('pairingCode').textContent = data.code;
       document.getElementById('pairingBox').style.display = 'block';
-    } else {
-      alert('Unexpected response. Check the panel in a few seconds.');
-    }
+    } else alert('Unexpected response. Check the panel in a few seconds.');
   } catch (e) {
     alert('Request failed: ' + e.message);
   }
-
   btn.disabled = false;
   btn.textContent = 'Get Pairing Code';
   checkStatus();
@@ -394,28 +438,26 @@ async function schedulePost() {
   const caption = document.getElementById('caption').value;
   const scheduledAt = document.getElementById('scheduledAt').value;
   if (!file || !scheduledAt) return alert('Video and time required');
-
   const form = new FormData();
   form.append('video', file);
   form.append('caption', caption);
   form.append('scheduledAt', scheduledAt);
-
+  form.append('tzOffset', String(new Date().getTimezoneOffset()));
   const btn = document.getElementById('scheduleBtn');
   btn.disabled = true;
   btn.textContent = 'Uploading...';
-
   try {
     const res = await fetch('/api/schedule', { method: 'POST', body: form });
     const data = await res.json();
     if (data.error) alert('Error: ' + data.error);
-    else alert('✅ Scheduled! Post #' + data.id);
+    else alert('✅ Scheduled! Post #' + data.id + '\nTime (Nairobi): ' + data.scheduledAtNairobi);
   } catch (e) {
     alert('Upload failed: ' + e.message);
   }
-
   btn.disabled = false;
   btn.textContent = 'Upload & Schedule';
   loadQueue();
+  loadActivity();
 }
 
 async function loadQueue() {
@@ -427,18 +469,114 @@ async function loadQueue() {
           <div class="post">
             <span class="badge ${r.status}">${r.status}</span>
             <span style="margin-left: 10px; font-weight: 600;">#${r.id}</span>
-            <span style="float: right;" class="muted">${new Date(r.scheduled_at).toLocaleString()}</span>
+            <span style="float: right;" class="muted">${r.scheduledNairobi || ''}</span>
             ${r.error ? `<div class="small" style="color:#f87171;">${r.error}</div>` : ''}
             <div class="small">${r.source_url}</div>
+            <div class="action-row">
+              ${r.status === 'pending' ? `<button class="action-btn" onclick="postNow(${r.id})">⚡ POST NOW</button>` : ''}
+              ${(r.status === 'failed' || r.status === 'deleted') ? `<button class="action-btn" onclick="undelete(${r.id})">♻️ RESTORE</button>` : ''}
+              <button class="action-btn" style="color:#ef4444;border-color:#ef4444;" onclick="deletePost(${r.id})">🗑️ DELETE</button>
+            </div>
           </div>`).join('')
       : '<p class="muted">No posts yet.</p>';
   } catch (e) {}
 }
 
+async function postNow(id) {
+  if (!confirm(`Post #${id} now?`)) return;
+  const res = await fetch('/api/post-now/' + id, { method: 'POST' });
+  const data = await res.json();
+  alert(data.message || data.error);
+  setTimeout(() => { loadQueue(); loadActivity(); }, 2000);
+}
+
+async function undelete(id) {
+  if (!confirm(`Restore post #${id}?`)) return;
+  const res = await fetch('/api/undelete/' + id, { method: 'POST' });
+  const data = await res.json();
+  alert(data.message || data.error);
+  setTimeout(() => { loadQueue(); loadActivity(); }, 2000);
+}
+
+async function deletePost(id) {
+  if (!confirm(`Delete post #${id} permanently?`)) return;
+  const res = await fetch('/api/queue/' + id, { method: 'DELETE' });
+  const data = await res.json();
+  alert(data.deleted ? 'Deleted' : 'Delete failed');
+  loadQueue();
+  loadActivity();
+}
+
+async function clearQueue() {
+  if (!confirm('Delete ALL posts from the queue? This cannot be undone.')) return;
+  const res = await fetch('/api/clear-queue', { method: 'POST' });
+  const data = await res.json();
+  alert(data.message || data.error);
+  loadQueue();
+  loadActivity();
+}
+
+// ─── Activity Log ──────────────────────────────────────────
+function setToday() {
+  document.getElementById('activityDay').value = getNairobiToday();
+  loadActivity();
+}
+
+async function loadActivity() {
+  try {
+    const day = document.getElementById('activityDay').value;
+    const url = day ? `/api/activity?day=${day}` : '/api/activity';
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (data.error) {
+      document.getElementById('activityList').innerHTML = `<p class="muted" style="color:#f87171;">${data.error}</p>`;
+      return;
+    }
+
+    // Summary
+    const summary = document.getElementById('activitySummary');
+    summary.style.display = 'block';
+    const posted = data.entries.filter(e => e.type === 'posted').length;
+    const failed = data.entries.filter(e => e.type === 'failed').length;
+    const scheduled = data.entries.filter(e => e.type === 'scheduled').length;
+    summary.innerHTML = `
+      <strong>📅 ${data.day}</strong> — 
+      <span style="color:#22c55e;">${posted} posted</span> · 
+      <span style="color:#f59e0b;">${scheduled} scheduled</span> · 
+      <span style="color:#ef4444;">${failed} failed</span>
+    `;
+
+    // List
+    const list = document.getElementById('activityList');
+    if (!data.entries.length) {
+      list.innerHTML = '<p class="muted">No activity for this day.</p>';
+      return;
+    }
+
+    list.innerHTML = data.entries.map(e => `
+      <div class="activity-entry ${e.type}">
+        <div class="activity-icon">${e.icon}</div>
+        <div class="activity-body">
+          <div class="activity-time">${e.timeNairobi}</div>
+          <div class="activity-msg">${e.message}</div>
+          ${e.url ? `<div class="activity-url">${e.url}</div>` : ''}
+        </div>
+      </div>
+    `).join('');
+  } catch (e) {
+    document.getElementById('activityList').innerHTML = `<p class="muted" style="color:#f87171;">Failed to load: ${e.message}</p>`;
+  }
+}
+
+// ─── Init ──────────────────────────────────────────────────
+document.getElementById('activityDay').value = getNairobiToday();
 checkStatus();
 loadQueue();
+loadActivity();
 setInterval(checkStatus, 3000);
 setInterval(loadQueue, 10000);
+setInterval(loadActivity, 15000);
 </script>
 </body>
 </html>
