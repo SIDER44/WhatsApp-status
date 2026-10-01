@@ -24,16 +24,15 @@ const tmpDir = path.join(dataDir, 'temp');
 if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
 const upload = multer({ dest: tmpDir });
 
-// ─── API routes ────────────────────────────────────────────────
+// ─── Status ────────────────────────────────────────────────
 app.get('/api/status', (req, res) => {
   res.json(getStatus());
 });
 
+// ─── Pair ──────────────────────────────────────────────────
 app.post('/api/pair', async (req, res) => {
   const { phoneNumber } = req.body;
-  if (!phoneNumber) {
-    return res.status(400).json({ error: 'Phone number required' });
-  }
+  if (!phoneNumber) return res.status(400).json({ error: 'Phone number required' });
   try {
     const result = await requestPairing(phoneNumber);
     res.json(result);
@@ -42,22 +41,29 @@ app.post('/api/pair', async (req, res) => {
   }
 });
 
+// ─── Unlink session ────────────────────────────────────────
 app.delete('/api/sessions/:userId', async (req, res) => {
   await removeSession(req.params.userId);
   res.json({ ok: true });
 });
 
+// ─── Schedule post ─────────────────────────────────────────
 app.post('/api/schedule', upload.single('video'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'Video file required' });
-    const { caption, scheduledAt } = req.body;
+    const { caption, scheduledAt, tzOffset } = req.body;
     if (!scheduledAt) return res.status(400).json({ error: 'Scheduled time required' });
+
+    const offsetMin = parseInt(tzOffset, 10);
+    const asIfUTC = new Date(scheduledAt + ':00Z').getTime();
+    const when = isNaN(offsetMin)
+      ? new Date(scheduledAt).getTime()
+      : asIfUTC + (offsetMin * 60 * 1000);
+
+    if (isNaN(when)) return res.status(400).json({ error: 'Invalid date format' });
 
     const url = await uploadVideo(req.file.path);
     fs.unlinkSync(req.file.path);
-
-    const when = new Date(scheduledAt).getTime();
-    if (isNaN(when)) return res.status(400).json({ error: 'Invalid date' });
 
     const info = db.prepare(
       `INSERT INTO posts (source_url, caption, scheduled_at) VALUES (?, ?, ?)`
@@ -67,27 +73,206 @@ app.post('/api/schedule', upload.single('video'), async (req, res) => {
       success: true,
       id: info.lastInsertRowid,
       url,
-      scheduledAt: new Date(when).toISOString(),
+      scheduledAtUTC: new Date(when).toISOString(),
+      scheduledAtNairobi: new Date(when).toLocaleString('en-KE', {
+        timeZone: 'Africa/Nairobi',
+        hour12: false,
+      }),
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
+// ─── Queue list ────────────────────────────────────────────
 app.get('/api/queue', (req, res) => {
   const rows = db.prepare(
-    `SELECT id, source_url, caption, scheduled_at, status, error
+    `SELECT id, source_url, caption, scheduled_at, status, error, posted_at
      FROM posts ORDER BY scheduled_at DESC LIMIT 50`
   ).all();
-  res.json(rows);
+
+  const formatted = rows.map(r => ({
+    ...r,
+    scheduledNairobi: new Date(r.scheduled_at).toLocaleString('en-KE', {
+      timeZone: 'Africa/Nairobi',
+      hour12: false,
+    }),
+    postedNairobi: r.posted_at ? new Date(r.posted_at).toLocaleString('en-KE', {
+      timeZone: 'Africa/Nairobi',
+      hour12: false,
+    }) : null,
+  }));
+
+  res.json(formatted);
 });
 
+// ─── Delete one post ───────────────────────────────────────
 app.delete('/api/queue/:id', (req, res) => {
-  const info = db.prepare(`DELETE FROM posts WHERE id=? AND status='pending'`).run(req.params.id);
+  const info = db.prepare(`DELETE FROM posts WHERE id=?`).run(req.params.id);
   res.json({ deleted: info.changes > 0 });
 });
 
-// ─── Start ─────────────────────────────────────────────────────
+// ─── POST NOW ──────────────────────────────────────────────
+app.post('/api/post-now/:id', async (req, res) => {
+  try {
+    const post = db.prepare(`SELECT * FROM posts WHERE id=?`).get(req.params.id);
+    if (!post) return res.status(404).json({ error: 'Post not found' });
+
+    db.prepare(`UPDATE posts SET scheduled_at=? WHERE id=?`)
+      .run(Date.now() - 1000, post.id);
+
+    res.json({
+      ok: true,
+      message: `Post #${post.id} will fire within 60 seconds. Check Activity Log.`,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── CLEAR QUEUE ───────────────────────────────────────────
+app.post('/api/clear-queue', (req, res) => {
+  const { status } = req.body || {};
+  let info;
+  if (status) {
+    info = db.prepare(`DELETE FROM posts WHERE status=?`).run(status);
+  } else {
+    info = db.prepare(`DELETE FROM posts`).run();
+  }
+  res.json({
+    ok: true,
+    deleted: info.changes,
+    message: status
+      ? `Deleted ${info.changes} post(s) with status "${status}"`
+      : `Deleted all ${info.changes} post(s)`,
+  });
+});
+
+// ─── UNDELETE / RESTORE ────────────────────────────────────
+app.post('/api/undelete/:id', (req, res) => {
+  try {
+    const post = db.prepare(`SELECT * FROM posts WHERE id=?`).get(req.params.id);
+    if (!post) return res.status(404).json({ error: 'Post not found' });
+
+    const newTime = Date.now() + 60000;
+    db.prepare(
+      `UPDATE posts SET status='pending', error=NULL, scheduled_at=? WHERE id=?`
+    ).run(newTime, post.id);
+
+    res.json({
+      ok: true,
+      message: `Post #${post.id} restored. Will fire in ~60 seconds.`,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── ACTIVITY LOG (NEW) ────────────────────────────────────
+// Returns everything the bot did on a specific day (Nairobi time).
+app.get('/api/activity', (req, res) => {
+  try {
+    const day = req.query.day; // "YYYY-MM-DD" in Nairobi time, or empty = today
+
+    // Compute Nairobi start/end of day in UTC milliseconds
+    let startMs, endMs, dayLabel;
+    const now = new Date();
+
+    if (day && /^\d{4}-\d{2}-\d{2}$/.test(day)) {
+      // Parse as midnight Nairobi
+      const [y, m, d] = day.split('-').map(Number);
+      startMs = Date.UTC(y, m - 1, d, 0, 0, 0) - (3 * 60 * 60 * 1000); // midnight Nairobi = 21:00 UTC previous day
+      endMs = startMs + 24 * 60 * 60 * 1000;
+      dayLabel = day;
+    } else {
+      // Today in Nairobi
+      const nairobiNow = new Date(now.toLocaleString('en-US', { timeZone: 'Africa/Nairobi' }));
+      const y = nairobiNow.getFullYear();
+      const m = nairobiNow.getMonth();
+      const d = nairobiNow.getDate();
+      startMs = Date.UTC(y, m, d, 0, 0, 0) - (3 * 60 * 60 * 1000);
+      endMs = startMs + 24 * 60 * 60 * 1000;
+      dayLabel = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    }
+
+    // Get posts scheduled OR posted within that window
+    const posts = db.prepare(`
+      SELECT id, source_url, caption, scheduled_at, status, error, posted_at
+      FROM posts
+      WHERE (scheduled_at >= ? AND scheduled_at < ?)
+         OR (posted_at IS NOT NULL AND posted_at >= ? AND posted_at < ?)
+      ORDER BY COALESCE(posted_at, scheduled_at) ASC
+    `).all(startMs, endMs, startMs, endMs);
+
+    // Build activity entries
+    const entries = [];
+
+    for (const p of posts) {
+      // Scheduled entry
+      entries.push({
+        time: p.scheduled_at,
+        timeNairobi: new Date(p.scheduled_at).toLocaleString('en-KE', {
+          timeZone: 'Africa/Nairobi',
+          hour12: false,
+        }),
+        type: 'scheduled',
+        icon: '📅',
+        postId: p.id,
+        message: `Post #${p.id} scheduled`,
+        url: p.source_url,
+      });
+
+      // Posted entry
+      if (p.posted_at) {
+        entries.push({
+          time: p.posted_at,
+          timeNairobi: new Date(p.posted_at).toLocaleString('en-KE', {
+            timeZone: 'Africa/Nairobi',
+            hour12: false,
+          }),
+          type: 'posted',
+          icon: '✅',
+          postId: p.id,
+          message: `Post #${p.id} published to WhatsApp Status`,
+          url: p.source_url,
+        });
+      }
+
+      // Failed entry
+      if (p.status === 'failed' && p.error) {
+        entries.push({
+          time: p.posted_at || p.scheduled_at,
+          timeNairobi: new Date(p.posted_at || p.scheduled_at).toLocaleString('en-KE', {
+            timeZone: 'Africa/Nairobi',
+            hour12: false,
+          }),
+          type: 'failed',
+          icon: '❌',
+          postId: p.id,
+          message: `Post #${p.id} failed: ${p.error}`,
+          url: p.source_url,
+        });
+      }
+    }
+
+    // Sort by time descending (newest first)
+    entries.sort((a, b) => b.time - a.time);
+
+    res.json({
+      day: dayLabel,
+      dayRange: {
+        startUTC: new Date(startMs).toISOString(),
+        endUTC: new Date(endMs).toISOString(),
+      },
+      count: entries.length,
+      entries,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Start ─────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`🌐 Panel running on port ${PORT}`);
   connectWhatsApp().then(() => {
