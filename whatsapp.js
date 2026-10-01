@@ -15,6 +15,7 @@ let status = {
   registered: false,
   user: null,
   pairingCode: null,
+  awaitingCode: false,
 };
 
 function getStatus() {
@@ -40,8 +41,24 @@ async function connectWhatsApp(onReady) {
 
   sock.ev.on('creds.update', saveCreds);
 
-  sock.ev.on('connection.update', (update) => {
-    const { connection, lastDisconnect } = update;
+  sock.ev.on('connection.update', async (update) => {
+    const { connection, lastDisconnect, qr } = update;
+
+    // ✅ CRITICAL FIX: Request pairing code ONLY when socket is ready
+    if ((connection === 'connecting' || qr) && !sock.authState.creds.registered && !status.awaitingCode) {
+      status.awaitingCode = true;
+      try {
+        const phone = (process.env.WHATSAPP_NUMBER || '').replace(/\D/g, '');
+        if (phone) {
+          const code = await sock.requestPairingCode(phone);
+          status.pairingCode = code;
+          console.log('📱 PAIRING CODE:', code);
+        }
+      } catch (err) {
+        console.log('Pairing code request failed:', err.message);
+        status.awaitingCode = false;
+      }
+    }
 
     if (connection === 'open') {
       status.connected = true;
@@ -54,6 +71,7 @@ async function connectWhatsApp(onReady) {
     if (connection === 'close') {
       const code = lastDisconnect?.error?.output?.statusCode;
       status.connected = false;
+      status.awaitingCode = false;
       if (code === DisconnectReason.loggedOut) {
         console.log('❌ Logged out. Delete wa-auth and re-pair.');
         status.registered = false;
