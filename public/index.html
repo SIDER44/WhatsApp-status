@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WA Status Bot — Neon Gala</title>
+<style>
+  :root {
+    --c1: #FF0000;
+    --c2: #00FFFF;
+    --c3: #FF00FF;
+    --c4: #00FF00;
+    --bg: #0a0a0f;
+    --card: #12121a;
+    --text: #e2e8f0;
+    --muted: #6b7280;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 20px;
+    max-width: 760px;
+    margin: 0 auto;
+    min-height: 100vh;
+    transition: background 1.5s ease;
+  }
+
+  h1 {
+    font-size: 1.6rem;
+    margin-bottom: 4px;
+    color: var(--c1);
+    text-shadow: 0 0 20px var(--c1);
+    transition: color 1.5s ease, text-shadow 1.5s ease;
+  }
+
+  .subtitle {
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-bottom: 20px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  h2 {
+    font-size: 1rem;
+    margin-bottom: 12px;
+    color: var(--c2);
+    text-shadow: 0 0 12px var(--c2);
+    transition: color 1.5s ease, text-shadow 1.5s ease;
+    letter-spacing: 1px;
+  }
+
+  .card {
+    background: var(--card);
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 16px;
+    border: 1px solid var(--c3);
+    box-shadow: 0 0 24px -8px var(--c3);
+    transition: border-color 1.5s ease, box-shadow 1.5s ease;
+  }
+
+  .status-dot {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 8px;
+    vertical-align: middle;
+    transition: background 1.5s ease;
+  }
+  .connected { background: #22c55e; box-shadow: 0 0 12px #22c55e; }
+  .disconnected { background: #ef4444; box-shadow: 0 0 12px #ef4444; }
+
+  label {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-bottom: 4px;
+    margin-top: 14px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  input, textarea {
+    width: 100%;
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid var(--c4);
+    background: #0a0a0f;
+    color: var(--text);
+    font-size: 1rem;
+    outline: none;
+    transition: border-color 1.5s ease, box-shadow 0.3s ease;
+  }
+
+  input:focus {
+    box-shadow: 0 0 16px -2px var(--c4);
+  }
+
+  button {
+    background: transparent;
+    color: var(--c1);
+    border: 2px solid var(--c1);
+    padding: 14px 24px;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 18px;
+    width: 100%;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    transition: all 0.3s ease;
+    box-shadow: 0 0 16px -4px var(--c1);
+  }
+
+  button:hover:not(:disabled) {
+    background: var(--c1);
+    color: #0a0a0f;
+    box-shadow: 0 0 32px -4px var(--c1);
+  }
+
+  button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .code {
+    font-family: 'Courier New', monospace;
+    font-size: 2rem;
+    letter-spacing: 6px;
+    text-align: center;
+    padding: 20px;
+    background: #0a0a0f;
+    border-radius: 10px;
+    margin: 14px 0;
+    color: var(--c2);
+    text-shadow: 0 0 20px var(--c2);
+    border: 1px solid var(--c2);
+    transition: all 1.5s ease;
+  }
+
+  .post {
+    padding: 14px;
+    border-bottom: 1px solid #1e1e2a;
+    font-size: 0.9rem;
+  }
+  .post:last-child { border: none; }
+
+  .badge {
+    font-size: 0.65rem;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .pending { background: #f59e0b; color: #000; }
+  .posted { background: #22c55e; color: #000; }
+  .failed { background: #ef4444; color: #fff; }
+  .deleted { background: #64748b; color: #fff; }
+
+  .muted { color: var(--muted); font-size: 0.85rem; }
+  .small {
+    font-size: 0.75rem;
+    word-break: break-all;
+    color: #64748b;
+    margin-top: 4px;
+  }
+
+  .palette-strip {
+    display: flex;
+    height: 4px;
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+  .palette-strip div {
+    flex: 1;
+    transition: background 1.5s ease;
+  }
+</style>
+</head>
+<body>
+
+  <h1>⚡ WhatsApp Status Bot</h1>
+  <div class="subtitle">Neon Gala · 100 Themes</div>
+  <div class="palette-strip" id="strip"></div>
+
+  <div class="card">
+    <h2>Connection</h2>
+    <p style="margin-top: 8px;">
+      <span class="status-dot disconnected" id="dot"></span>
+      <span id="statusText">Checking...</span>
+    </p>
+    <div id="pairingBox" style="display: none;">
+      <p class="muted" style="margin-top: 12px;">
+        Enter this code in WhatsApp → Linked Devices → Link with phone number
+      </p>
+      <div class="code" id="pairingCode">—</div>
+    </div>
+    <div id="pairForm">
+      <label>Phone Number (with country code)</label>
+      <input type="tel" id="phone" placeholder="254712345678">
+      <button onclick="requestPair()">Get Pairing Code</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Schedule Video Status</h2>
+    <label>Video File (max 200MB)</label>
+    <input type="file" id="videoFile" accept="video/*">
+    <label>Caption (optional)</label>
+    <input type="text" id="caption" placeholder="Your status caption...">
+    <label>Schedule Time</label>
+    <input type="datetime-local" id="scheduledAt">
+    <button id="scheduleBtn" onclick="schedulePost()">Upload &amp; Schedule</button>
+  </div>
+
+  <div class="card">
+    <h2>Queue</h2>
+    <div id="queueList">Loading...</div>
+  </div>
+
+<script>
+const THEMES = [
+  "#FF0000","#FF3333","#DC143C","#FF2D2D","#CC0000","#FF0033","#FF0028","#FF5555",
+  "#EE2222","#FF0044","#FF0066","#FF0055","#FF6600","#FF4500","#FF8C00","#FF5500",
+  "#FF7800","#FF7F50","#FF5E00","#FF9900","#FF6600","#FF8000","#FFFF00","#FFD700",
+  "#FFAA00","#FFCC00","#FFBB00","#FFDD00","#FFFF66","#FFE600","#FFB300","#FFEE33",
+  "#00FF00","#B4FF00","#00FF7F","#00FFA3","#AAFF00","#00FF99","#66FF00","#33FF33",
+  "#00CC66","#33CC00","#00FF66","#00FFBF","#00FFFF","#7FFFD4","#00E6FF","#00FFCC",
+  "#33FFFF","#33FFAA","#00FFB4","#00FFD5","#66FFEE","#00FFE0","#0080FF","#4169E1",
+  "#00BFFF","#0066FF","#0099FF","#3399FF","#00AAFF","#0000FF","#0044FF","#0055FF",
+  "#0066CC","#66CCFF","#8B00FF","#A855F7","#6600FF","#9966FF","#7700FF","#AA00FF",
+  "#CC00FF","#6666FF","#5000FF","#C882FF","#9900FF","#BB55FF","#FF00FF","#FF1493",
+  "#FF0099","#FF007F","#E600FF","#FF3377","#FF33CC","#FF4499","#FF00AA","#FF00EE",
+  "#FF00CC","#FF66AA","#FF4400","#00FFAA","#BB66FF","#FF33DD","#0077FF","#FF6688",
+  "#99FF00","#FFAA00","#FF0055","#FF00AA"
+];
+
+(function buildStrip() {
+  const strip = document.getElementById('strip');
+  for (let i = 0; i < 20; i++) {
+    const seg = document.createElement('div');
+    seg.style.background = THEMES[(i * 5) % THEMES.length];
+    strip.appendChild(seg);
+  }
+})();
+
+let idx = 0;
+function rotatePalette() {
+  const root = document.documentElement;
+  const c1 = THEMES[idx % THEMES.length];
+  const c2 = THEMES[(idx + 25) % THEMES.length];
+  const c3 = THEMES[(idx + 50) % THEMES.length];
+  const c4 = THEMES[(idx + 75) % THEMES.length];
+
+  root.style.setProperty('--c1', c1);
+  root.style.setProperty('--c2', c2);
+  root.style.setProperty('--c3', c3);
+  root.style.setProperty('--c4', c4);
+
+  const strip = document.getElementById('strip');
+  [...strip.children].forEach((seg, i) => {
+    seg.style.background = THEMES[(idx + i * 5) % THEMES.length];
+  });
+
+  idx++;
+}
+rotatePalette();
+setInterval(rotatePalette, 3000);
+
+async function checkStatus() {
+  try {
+    const res = await fetch('/api/status');
+    const data = await res.json();
+    const dot = document.getElementById('dot');
+    const txt = document.getElementById('statusText');
+    const pairingBox = document.getElementById('pairingBox');
+    const pairForm = document.getElementById('pairForm');
+
+    if (data.connected) {
+      dot.className = 'status-dot connected';
+      txt.textContent = 'Connected as ' + data.user;
+      pairingBox.style.display = 'none';
+      pairForm.style.display = 'none';
+    } else {
+      dot.className = 'status-dot disconnected';
+      txt.textContent = 'Disconnected';
+      pairForm.style.display = 'block';
+      if (data.pairingCode) {
+        pairingBox.style.display = 'block';
+        document.getElementById('pairingCode').textContent = data.pairingCode;
+      }
+    }
+  } catch (e) {}
+}
+
+async function requestPair() {
+  const phone = document.getElementById('phone').value.trim();
+  if (!phone) return alert('Enter your phone number');
+
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = 'Requesting...';
+
+  try {
+    const res = await fetch('/api/pair', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phoneNumber: phone })
+    });
+    const data = await res.json();
+    if (data.error) {
+      alert('Error: ' + data.error);
+    } else {
+      document.getElementById('pairingCode').textContent = data.code;
+      document.getElementById('pairingBox').style.display = 'block';
+    }
+  } catch (e) {
+    alert('Request failed: ' + e.message);
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Get Pairing Code';
+}
+
+async function schedulePost() {
+  const file = document.getElementById('videoFile').files[0];
+  const caption = document.getElementById('caption').value;
+  const scheduledAt = document.getElementById('scheduledAt').value;
+  if (!file || !scheduledAt) return alert('Video and time required');
+
+  const form = new FormData();
+  form.append('video', file);
+  form.append('caption', caption);
+  form.append('scheduledAt', scheduledAt);
+
+  const btn = document.getElementById('scheduleBtn');
+  btn.disabled = true;
+  btn.textContent = 'Uploading...';
+
+  try {
+    const res = await fetch('/api/schedule', { method: 'POST', body: form });
+    const data = await res.json();
+    if (data.error) alert('Error: ' + data.error);
+    else alert('✅ Scheduled! Post #' + data.id + '\nURL: ' + data.url);
+  } catch (e) {
+    alert('Upload failed: ' + e.message);
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Upload & Schedule';
+  loadQueue();
+}
+
+async function loadQueue() {
+  try {
+    const res = await fetch('/api/queue');
+    const rows = await res.json();
+    document.getElementById('queueList').innerHTML = rows.length
+      ? rows.map(r => `
+          <div class="post">
+            <span class="badge ${r.status}">${r.status}</span>
+            <span style="margin-left: 10px; font-weight: 600;">#${r.id}</span>
+            <span style="float: right;" class="muted">${new Date(r.scheduled_at).toLocaleString()}</span>
+            ${r.error ? `<div class="small" style="color:#f87171;">${r.error}</div>` : ''}
+            <div class="small">${r.source_url}</div>
+          </div>`).join('')
+      : '<p class="muted">No posts yet.</p>';
+  } catch (e) {}
+}
+
+checkStatus();
+loadQueue();
+setInterval(checkStatus, 5000);
+setInterval(loadQueue, 10000);
+</script>
+</body>
+</html>
