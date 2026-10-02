@@ -22,7 +22,14 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const tmpDir = path.join(dataDir, 'temp');
 if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
-const upload = multer({ dest: tmpDir });
+
+// Raise multer limits so large videos don't trip the server
+const upload = multer({
+  dest: tmpDir,
+  limits: {
+    fileSize: 200 * 1024 * 1024, // 200MB
+  },
+});
 
 // ─── Status ────────────────────────────────────────────────
 app.get('/api/status', (req, res) => {
@@ -48,40 +55,61 @@ app.delete('/api/sessions/:userId', async (req, res) => {
 });
 
 // ─── Schedule post ─────────────────────────────────────────
-app.post('/api/schedule', upload.single('video'), async (req, res) => {
-  try {
-    if (!req.file) return res.status(400).json({ error: 'Video file required' });
-    const { caption, scheduledAt, tzOffset } = req.body;
-    if (!scheduledAt) return res.status(400).json({ error: 'Scheduled time required' });
+app.post('/api/schedule', (req, res) => {
+  upload.single('video')(req, res, async (err) => {
+    // Multer errors (size limit, disk, etc.)
+    if (err) {
+      console.error('Upload middleware error:', err.message);
+      return res.status(500).json({ error: 'Upload failed: ' + err.message });
+    }
 
-    const offsetMin = parseInt(tzOffset, 10);
-    const asIfUTC = new Date(scheduledAt + ':00Z').getTime();
-    const when = isNaN(offsetMin)
-      ? new Date(scheduledAt).getTime()
-      : asIfUTC + (offsetMin * 60 * 1000);
+    try {
+      if (!req.file) return res.status(400).json({ error: 'Video file required' });
+      const { caption, scheduledAt, tzOffset } = req.body;
+      if (!scheduledAt) return res.status(400).json({ error: 'Scheduled time required' });
 
-    if (isNaN(when)) return res.status(400).json({ error: 'Invalid date format' });
+      const offsetMin = parseInt(tzOffset, 10);
+      const asIfUTC = new Date(scheduledAt + ':00Z').getTime();
+      const when = isNaN(offsetMin)
+        ? new Date(scheduledAt).getTime()
+        : asIfUTC + (offsetMin * 60 * 1000);
 
-    const url = await uploadVideo(req.file.path);
-    fs.unlinkSync(req.file.path);
+      if (isNaN(when)) return res.status(400).json({ error: 'Invalid date format' });
 
-    const info = db.prepare(
-      `INSERT INTO posts (source_url, caption, scheduled_at) VALUES (?, ?, ?)`
-    ).run(url, caption || '', when);
+      console.log(`📤 Uploading to Catbox (size: ${(req.file.size / 1024 / 1024).toFixed(1)} MB)...`);
 
-    res.json({
-      success: true,
-      id: info.lastInsertRowid,
-      url,
-      scheduledAtUTC: new Date(when).toISOString(),
-      scheduledAtNairobi: new Date(when).toLocaleString('en-KE', {
-        timeZone: 'Africa/Nairobi',
-        hour12: false,
-      }),
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+      // Wrap Catbox upload with timeout so we can see where it's failing
+      const url = await Promise.race([
+        uploadVideo(req.file.path),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Catbox upload timed out after 4 minutes')), 240000)
+        ),
+      ]);
+
+      fs.unlinkSync(req.file.path);
+
+      const info = db.prepare(
+        `INSERT INTO posts (source_url, caption, scheduled_at) VALUES (?, ?, ?)`
+      ).run(url, caption || '', when);
+
+      res.json({
+        success: true,
+        id: info.lastInsertRowid,
+        url,
+        scheduledAtUTC: new Date(when).toISOString(),
+        scheduledAtNairobi: new Date(when).toLocaleString('en-KE', {
+          timeZone: 'Africa/Nairobi',
+          hour12: false,
+        }),
+      });
+    } catch (err) {
+      console.error('Schedule error:', err.message);
+      if (req.file?.path && fs.existsSync(req.file.path)) {
+        try { fs.unlinkSync(req.file.path); } catch {}
+      }
+      res.status(500).json({ error: err.message });
+    }
+  });
 });
 
 // ─── Queue list ────────────────────────────────────────────
@@ -168,24 +196,19 @@ app.post('/api/undelete/:id', (req, res) => {
   }
 });
 
-// ─── ACTIVITY LOG (NEW) ────────────────────────────────────
-// Returns everything the bot did on a specific day (Nairobi time).
+// ─── ACTIVITY LOG ──────────────────────────────────────────
 app.get('/api/activity', (req, res) => {
   try {
-    const day = req.query.day; // "YYYY-MM-DD" in Nairobi time, or empty = today
-
-    // Compute Nairobi start/end of day in UTC milliseconds
+    const day = req.query.day;
     let startMs, endMs, dayLabel;
     const now = new Date();
 
     if (day && /^\d{4}-\d{2}-\d{2}$/.test(day)) {
-      // Parse as midnight Nairobi
       const [y, m, d] = day.split('-').map(Number);
-      startMs = Date.UTC(y, m - 1, d, 0, 0, 0) - (3 * 60 * 60 * 1000); // midnight Nairobi = 21:00 UTC previous day
+      startMs = Date.UTC(y, m - 1, d, 0, 0, 0) - (3 * 60 * 60 * 1000);
       endMs = startMs + 24 * 60 * 60 * 1000;
       dayLabel = day;
     } else {
-      // Today in Nairobi
       const nairobiNow = new Date(now.toLocaleString('en-US', { timeZone: 'Africa/Nairobi' }));
       const y = nairobiNow.getFullYear();
       const m = nairobiNow.getMonth();
@@ -195,7 +218,6 @@ app.get('/api/activity', (req, res) => {
       dayLabel = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     }
 
-    // Get posts scheduled OR posted within that window
     const posts = db.prepare(`
       SELECT id, source_url, caption, scheduled_at, status, error, posted_at
       FROM posts
@@ -204,11 +226,8 @@ app.get('/api/activity', (req, res) => {
       ORDER BY COALESCE(posted_at, scheduled_at) ASC
     `).all(startMs, endMs, startMs, endMs);
 
-    // Build activity entries
     const entries = [];
-
     for (const p of posts) {
-      // Scheduled entry
       entries.push({
         time: p.scheduled_at,
         timeNairobi: new Date(p.scheduled_at).toLocaleString('en-KE', {
@@ -222,7 +241,6 @@ app.get('/api/activity', (req, res) => {
         url: p.source_url,
       });
 
-      // Posted entry
       if (p.posted_at) {
         entries.push({
           time: p.posted_at,
@@ -238,7 +256,6 @@ app.get('/api/activity', (req, res) => {
         });
       }
 
-      // Failed entry
       if (p.status === 'failed' && p.error) {
         entries.push({
           time: p.posted_at || p.scheduled_at,
@@ -255,7 +272,6 @@ app.get('/api/activity', (req, res) => {
       }
     }
 
-    // Sort by time descending (newest first)
     entries.sort((a, b) => b.time - a.time);
 
     res.json({
