@@ -40,27 +40,22 @@ async function postStatus(sock, post) {
 
   const buffer = fs.readFileSync(localPath);
 
-  // ─── FIX: Build a real contact list for statusJidList ──────
-  // Fetch contacts so WhatsApp knows who to send the status to.
-  // If the list is empty, WhatsApp will silently discard the status.
+  // Build a real contact list for statusJidList as per docs
   let statusJidList = [];
   try {
+    // The official docs require a list of contact JIDs [citation:1][citation:16]
     const contacts = await sock.getContacts();
     statusJidList = contacts
       .filter(c => c.id && c.id.endsWith('@s.whatsapp.net'))
       .map(c => c.id);
 
-    // If you have no contacts, add your own ID as a fallback
-    if (statusJidList.length === 0) {
-      statusJidList = [sock.user.id];
-    }
+    console.log(`📤 Sending status to ${statusJidList.length} contact(s)...`);
   } catch (err) {
-    console.error('Failed to fetch contacts for status:', err.message);
+    console.error('Failed to fetch contacts:', err.message);
     statusJidList = [sock.user.id];
   }
 
-  console.log(`📤 Sending status to ${statusJidList.length} contact(s)...`);
-
+  // Official Baileys documented syntax for posting a video status [citation:1][citation:16]
   await sock.sendMessage(
     'status@broadcast',
     {
@@ -69,8 +64,8 @@ async function postStatus(sock, post) {
       mimetype: 'video/mp4',
     },
     {
-      statusJidList: statusJidList, // Use the real contact list
-      broadcast: true,
+      statusJidList: statusJidList, // Required by docs
+      broadcast: true,              // Required by docs
       backgroundColor: '#000000',
     }
   );
