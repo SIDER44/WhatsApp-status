@@ -40,10 +40,9 @@ async function postStatus(sock, post) {
 
   const buffer = fs.readFileSync(localPath);
 
-  // Build a real contact list for statusJidList as per docs
+  // Build a real contact list for statusJidList as per docs [citation:5][citation:14]
   let statusJidList = [];
   try {
-    // The official docs require a list of contact JIDs [citation:1][citation:16]
     const contacts = await sock.getContacts();
     statusJidList = contacts
       .filter(c => c.id && c.id.endsWith('@s.whatsapp.net'))
@@ -55,18 +54,16 @@ async function postStatus(sock, post) {
     statusJidList = [sock.user.id];
   }
 
-  // Official Baileys documented syntax for posting a video status [citation:1][citation:16]
-  await sock.sendMessage(
-    'status@broadcast',
+  // Use the sendStatus method from the working Estella fork
+  // Signature: sendStatus(jid, statusJid, content)
+  await sock.sendStatus(
+    sock.user.id,          // your own JID as sender
+    'status@broadcast',    // the status broadcast JID
     {
       video: buffer,
       caption: post.caption || undefined,
       mimetype: 'video/mp4',
-    },
-    {
-      statusJidList: statusJidList, // Required by docs
-      broadcast: true,              // Required by docs
-      backgroundColor: '#000000',
+      statusJidList: statusJidList,
     }
   );
 
