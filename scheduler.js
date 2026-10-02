@@ -6,15 +6,33 @@ const db = require('./db');
 const { getSock } = require('./whatsapp');
 
 const dataDir = process.env.RAILWAY_VOLUME_MOUNT_PATH || '/data';
+const mediaDir = path.join(dataDir, 'media');
 
-async function downloadVideo(url) {
+function sendWithTimeout(sock, jid, content, options, ms = 60000) {
+  return Promise.race([
+    sock.sendMessage(jid, content, options),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`sendMessage timed out after ${ms}ms`)), ms)
+    ),
+  ]);
+}
+
+async function getVideoPath(source) {
+  if (source.startsWith('local:')) {
+    const filename = source.replace('local:', '');
+    const p = path.join(mediaDir, filename);
+    if (!fs.existsSync(p)) {
+      throw new Error(`Local video missing: ${filename}`);
+    }
+    return p;
+  }
+
   const tmpDir = path.join(dataDir, 'temp');
   if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
-
   const filePath = path.join(tmpDir, `vid_${Date.now()}.mp4`);
   const writer = fs.createWriteStream(filePath);
 
-  const res = await axios.get(url, {
+  const res = await axios.get(source, {
     responseType: 'stream',
     timeout: 180000,
     maxContentLength: Infinity,
@@ -29,48 +47,32 @@ async function downloadVideo(url) {
   return filePath;
 }
 
-// Wrap sendMessage in a timeout so it can never hang the socket
-function sendWithTimeout(sock, jid, content, options, ms = 60000) {
-  return Promise.race([
-    sock.sendMessage(jid, content, options),
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error(`sendMessage timed out after ${ms}ms`)), ms)
-    ),
-  ]);
-}
-
 async function postStatus(sock, post) {
-  const localPath = await downloadVideo(post.source_url);
+  const localPath = await getVideoPath(post.source_url);
   const stat = fs.statSync(localPath);
 
   if (stat.size > 200 * 1024 * 1024) {
-    fs.unlinkSync(localPath);
     throw new Error('Video too large (over 200MB)');
   }
 
   const buffer = fs.readFileSync(localPath);
 
-  // ─── Build a SAFE contact list ─────────────────────────
-  // The 500 RangeError crash happens when statusJidList is too large.
-  // Keep it under 50 contacts to fit the WhatsApp protocol frame.
   let statusJidList = [];
   try {
     const contacts = await sock.getContacts();
     statusJidList = contacts
       .filter(c => c.id && c.id.endsWith('@s.whatsapp.net'))
-      .slice(0, 50)  // limit to 50 max
+      .slice(0, 50)
       .map(c => c.id);
-
-    console.log(`📤 Sending status to ${statusJidList.length} contact(s)...`);
   } catch (err) {
     console.error('Failed to fetch contacts:', err.message);
-    statusJidList = [sock.user.id];
   }
 
-  // Fallback if list is empty
   if (statusJidList.length === 0) {
     statusJidList = [sock.user.id];
   }
+
+  console.log(`📤 Posting status to ${statusJidList.length} contact(s)...`);
 
   await sendWithTimeout(
     sock,
@@ -88,7 +90,9 @@ async function postStatus(sock, post) {
     60000
   );
 
-  fs.unlinkSync(localPath);
+  if (post.source_url.startsWith('local:')) {
+    try { fs.unlinkSync(localPath); } catch {}
+  }
 }
 
 function startScheduler() {
@@ -120,7 +124,6 @@ function startScheduler() {
     }
   });
 
-  // Mark posts deleted 24h after posting
   cron.schedule('0 * * * *', () => {
     const cutoff = Date.now() - 24 * 60 * 60 * 1000;
     db.prepare(
