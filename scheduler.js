@@ -29,6 +29,16 @@ async function downloadVideo(url) {
   return filePath;
 }
 
+// ─── FIX: wrap sendMessage in a timeout so it can never hang ───
+function sendWithTimeout(sock, jid, content, options, ms = 60000) {
+  return Promise.race([
+    sock.sendMessage(jid, content, options),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`sendMessage timed out after ${ms}ms`)), ms)
+    ),
+  ]);
+}
+
 async function postStatus(sock, post) {
   const localPath = await downloadVideo(post.source_url);
   const stat = fs.statSync(localPath);
@@ -40,31 +50,22 @@ async function postStatus(sock, post) {
 
   const buffer = fs.readFileSync(localPath);
 
-  // Build a real contact list for statusJidList as per docs [citation:5][citation:14]
-  let statusJidList = [];
-  try {
-    const contacts = await sock.getContacts();
-    statusJidList = contacts
-      .filter(c => c.id && c.id.endsWith('@s.whatsapp.net'))
-      .map(c => c.id);
-
-    console.log(`📤 Sending status to ${statusJidList.length} contact(s)...`);
-  } catch (err) {
-    console.error('Failed to fetch contacts:', err.message);
-    statusJidList = [sock.user.id];
-  }
-
-  // Use the sendStatus method from the working Estella fork
-  // Signature: sendStatus(jid, statusJid, content)
-  await sock.sendStatus(
-    sock.user.id,          // your own JID as sender
-    'status@broadcast',    // the status broadcast JID
+  // This is the call that was hanging and crashing the socket.
+  // Now it has a 60-second timeout so it can never block forever.
+  await sendWithTimeout(
+    sock,
+    'status@broadcast',
     {
       video: buffer,
       caption: post.caption || undefined,
       mimetype: 'video/mp4',
-      statusJidList: statusJidList,
-    }
+    },
+    {
+      statusJidList: [sock.user.id],
+      broadcast: true,
+      backgroundColor: '#000000',
+    },
+    60000
   );
 
   fs.unlinkSync(localPath);
