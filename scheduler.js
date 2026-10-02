@@ -29,7 +29,7 @@ async function downloadVideo(url) {
   return filePath;
 }
 
-// ─── FIX: wrap sendMessage in a timeout so it can never hang ───
+// Wrap sendMessage in a timeout so it can never hang the socket
 function sendWithTimeout(sock, jid, content, options, ms = 60000) {
   return Promise.race([
     sock.sendMessage(jid, content, options),
@@ -50,8 +50,28 @@ async function postStatus(sock, post) {
 
   const buffer = fs.readFileSync(localPath);
 
-  // This is the call that was hanging and crashing the socket.
-  // Now it has a 60-second timeout so it can never block forever.
+  // ─── Build a SAFE contact list ─────────────────────────
+  // The 500 RangeError crash happens when statusJidList is too large.
+  // Keep it under 50 contacts to fit the WhatsApp protocol frame.
+  let statusJidList = [];
+  try {
+    const contacts = await sock.getContacts();
+    statusJidList = contacts
+      .filter(c => c.id && c.id.endsWith('@s.whatsapp.net'))
+      .slice(0, 50)  // limit to 50 max
+      .map(c => c.id);
+
+    console.log(`📤 Sending status to ${statusJidList.length} contact(s)...`);
+  } catch (err) {
+    console.error('Failed to fetch contacts:', err.message);
+    statusJidList = [sock.user.id];
+  }
+
+  // Fallback if list is empty
+  if (statusJidList.length === 0) {
+    statusJidList = [sock.user.id];
+  }
+
   await sendWithTimeout(
     sock,
     'status@broadcast',
@@ -61,7 +81,7 @@ async function postStatus(sock, post) {
       mimetype: 'video/mp4',
     },
     {
-      statusJidList: [sock.user.id],
+      statusJidList: statusJidList,
       broadcast: true,
       backgroundColor: '#000000',
     },
@@ -100,6 +120,7 @@ function startScheduler() {
     }
   });
 
+  // Mark posts deleted 24h after posting
   cron.schedule('0 * * * *', () => {
     const cutoff = Date.now() - 24 * 60 * 60 * 1000;
     db.prepare(
